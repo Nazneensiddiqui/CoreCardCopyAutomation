@@ -182,7 +182,8 @@ const CopyFolderForm = () => {
         : `${basePath}\\Application\\PublishCode\\${mod}`;
 
     // Call backend to check if the source path exists
-    const res = await fetch('http://localhost:8000/check-path', {
+    // const res = await fetch('http://localhost:8000/check-path', {
+   const res = await fetch(' https://corecardcopyautomation-3.onrender.com', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pathToCheck: sourcePath })
@@ -226,7 +227,8 @@ const CopyFolderForm = () => {
     setMessage('');
     setCopyDetails(null);
     try {
-      const res = await fetch('http://localhost:8000/copy-folders', {
+      // const res = await fetch('http://localhost:8000/copy-folders', {
+      const res = await fetch('https://corecardcopyautomation-3.onrender.com', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tasks: paths })
