@@ -235,12 +235,12 @@ const CopyFolderForm = () => {
       });
 
       const data = await res.json();
-      setMessage(data.message || 'Copy completed!');
+      setMessage(data.message || 'Copy completed!!');
       if (data.details) {
         setCopyDetails(data.details);
       }
     } catch (err) {
-      setMessage('Error occurred while copying.');
+      setMessage('Error occurred while copying...');
     } finally {
       setLoading(false);
     }
