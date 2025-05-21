@@ -146,15 +146,20 @@ import './CopyFolderForm.css';
 import core from './images/corecard.jpg';
 
 const modules = ["DSL", "WCF", "CoreMoney", "CoreAdmin", "SelfService", "PraxellAPI"];
+const dbModules = ["CoreMoneyDB", "CoreIssueDB", "CoreAuthDB", "CoreLibraryDB", "dashBoardDB"];
 
 const CopyFolderForm = () => {
   const [basePath, setBasePath] = useState('');
   const [selectedModules, setSelectedModules] = useState({});
   const [paths, setPaths] = useState({});
   const [message, setMessage] = useState('');
+  const [dbDetails, setDbDetails] = useState({});
   const [loading, setLoading] = useState(false);
   const [copyDetails, setCopyDetails] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
+  const [dbmessage, setdbMessage] = useState('');
+  const [dbloading, setdbLoading] = useState(false);
+ const [dbbasePath, setdbBasePath] = useState('');
 
   const handleBasePathChange = (e) => {
     const value = e.target.value;
@@ -173,65 +178,90 @@ const CopyFolderForm = () => {
   };
 
   const handleCheckboxChange = async (mod, checked) => {
-  setSelectedModules((prev) => ({ ...prev, [mod]: checked }));
+    setSelectedModules((prev) => ({ ...prev, [mod]: checked }));
 
-  if (checked) {
-    const sourcePath =
-      mod === 'DSL'
-        ? `${basePath}\\Application\\${mod}`
-        : `${basePath}\\Application\\PublishCode\\${mod}`;
+    if (checked) {
+      const sourcePath =
+        mod === 'DSL'
+          ? `${basePath}\\Application\\${mod}`
+          : `${basePath}\\Application\\PublishCode\\${mod}`;
 
-    // Call backend to check if the source path exists
-    // const res = await fetch('http://localhost:8000/check-path', {
-   const res = await fetch(' https://corecardcopyautomation-3.onrender.com', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pathToCheck: sourcePath })
-    });
+      // Call backend to check if the source path exists
+      const res = await fetch('http://localhost:8000/check-path', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pathToCheck: sourcePath }),
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-  if (data.exists) {
-  setPaths((prev) => ({
-    ...prev,
-    [mod]: { source: sourcePath, destination: '' }
-  }));
-  setErrorMessage(''); // clear any previous error
-} else {
-  setErrorMessage(`❌ Source path for "${mod}" does not exist.`);
-  setSelectedModules((prev) => {
-    const updated = { ...prev };
-    delete updated[mod];
-    return updated;
-  });
-}
-
-  } else {
-    setPaths((prev) => {
-      const updated = { ...prev };
-      delete updated[mod];
-      return updated;
-    });
-  }
-};
+      if (data.exists) {
+        setPaths((prev) => ({
+          ...prev,
+          [mod]: { source: sourcePath, destination: '' },
+        }));
+        setErrorMessage(''); // Clear any previous error
+      } else {
+        setErrorMessage(`❌ Source path for "${mod}" does not exist.`);
+        setSelectedModules((prev) => {
+          const updated = { ...prev };
+          delete updated[mod];
+          return updated;
+        });
+      }
+    } else {
+      setPaths((prev) => {
+        const updated = { ...prev };
+        delete updated[mod];
+        return updated;
+      });
+    }
+  };
 
   const handleDestinationChange = (mod, value) => {
     setPaths((prev) => ({
       ...prev,
-      [mod]: { ...prev[mod], destination: value }
+      [mod]: { ...prev[mod], destination: value },
     }));
   };
+
+  //****************** */ DB Restore Handlers********************************
+const dbFileMap = {
+  CoreMoneyDB: "\\Application\\DB\\MPE\\CM.bak",
+  CoreIssueDB: "\\Application\\DB\\MPE\\CI.bak",
+  CoreAuthDB: "\\Application\\DB\\MPE\\CAUTH.bak",
+  CoreLibraryDB: "\\Application\\DB\\MPE\\CL.bak",
+  dashBoardDB: "\\Application\\DB\\MPE\\DASHBOARD.bak"
+};
+
+const handleDbCheckboxChange = (dbKey, checked) => {
+  setDbDetails((prev) => {
+    const newDetails = { ...prev };
+
+    if (checked) {
+      // Sirf dbLocation ko fill karo, baaki fields ko default chhodo
+      newDetails[dbKey] = {
+        dbLocation: dbbasePath + (dbFileMap[dbKey] || ""), // dbLocation ko basePath ke saath append karo
+      };
+    } else {
+      delete newDetails[dbKey]; // Agar checkbox uncheck ho to DB details hata do
+    }
+
+    return newDetails;
+  });
+};
+
+
 
   const handleSubmit = async () => {
     setLoading(true);
     setMessage('');
     setCopyDetails(null);
     try {
-      // const res = await fetch('http://localhost:8000/copy-folders', {
-      const res = await fetch('https://corecardcopyautomation-3.onrender.com', {
+      const res = await fetch('http://localhost:8000/copy-folders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tasks: paths })
+        body: JSON.stringify({ tasks: paths }),
       });
 
       const data = await res.json();
@@ -246,6 +276,39 @@ const CopyFolderForm = () => {
     }
   };
 
+  // ********************DB Restore****************************
+  const handleDbRestore = async () => {
+  setdbLoading(true);
+  setdbMessage('');
+
+  try {
+   for (const [key, {  dbLocation, dbName, mdfPath, ldfPath }] of Object.entries(dbDetails)) {
+  if (!dbLocation || !dbName || !mdfPath || !ldfPath ) {
+    setdbMessage('Please fill all fields (DB Location, name, MDF, LDF) for each selected DB.');
+    setdbLoading(false);
+    return;
+  }
+
+  const payload = {  dbLocation, dbName, mdfPath, ldfPath};
+
+  const res = await fetch('http://localhost:8000/db-restore', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    });
+ console.log(payload)
+  const data = await res.json();
+  setdbMessage((prev) => `${prev}\n${data.message}`);
+}
+  } catch (err) {
+    console.error(err);
+    setdbMessage('❌ Error occurred during DB restore.');
+  } finally {
+    setdbLoading(false);
+  }
+};
+
+
   const downloadSummary = () => {
     if (!copyDetails) return;
 
@@ -258,8 +321,11 @@ const CopyFolderForm = () => {
       const src = `${detail.sourceFiles}/${detail.sourceFolders}`;
       const dest = `${detail.destinationFiles}/${detail.destinationFolders}`;
       const time = detail.durationSeconds.toFixed(2);
-      const match = (detail.sourceFiles === detail.destinationFiles &&
-                     detail.sourceFolders === detail.destinationFolders) ? 'YES' : 'NO';
+      const match =
+        detail.sourceFiles === detail.destinationFiles &&
+        detail.sourceFolders === detail.destinationFolders
+          ? 'YES'
+          : 'NO';
 
       content += `${mod.padEnd(14)} ${src.padEnd(13)} ${dest.padEnd(11)} ${time.padEnd(9)} ${match}\n`;
     });
@@ -303,12 +369,8 @@ const CopyFolderForm = () => {
         </div>
       </div>
 
-      {/* source exsist message */}
-      {errorMessage && (
-  <div className="error-message">
-    {errorMessage}
-  </div>
-)}
+      {/* Source existence message */}
+      {errorMessage && <div className="error-message">{errorMessage}</div>}
 
       {Object.keys(paths).map((mod) => (
         <div key={mod} className="path-inputs">
@@ -331,7 +393,7 @@ const CopyFolderForm = () => {
       ))}
 
       <button onClick={handleSubmit} disabled={loading} className="submit-btn">
-        {loading ? <span className="loader">Process...</span> : <>🚀 Start Process</>}
+        {loading ? <span className="loader">Processing...</span> : <>🚀 Start Process</>}
       </button>
 
       {message && <p className="message">{message}</p>}
@@ -357,6 +419,220 @@ const CopyFolderForm = () => {
           </button>
         </div>
       )}
+{/* ******************************************DBRestor************************************ */}
+     {/* <h4>Database Restore</h4>
+
+<div className="form-group">
+  <label>Select Databases:</label>
+  <div className="checkbox-row">
+    {dbModules.map((db) => (
+      <label key={db} className="checkbox-inline">
+        <input
+          type="checkbox"
+          checked={!!dbDetails[db]}
+          onChange={(e) => handleDbCheckboxChange(db, e.target.checked)}
+        />
+        {db}
+      </label>
+    ))}
+  </div>
+</div>
+
+{Object.keys(dbDetails).length > 0 && (
+  <>
+    {Object.keys(dbDetails).map((key) => (
+      <div key={key} className="db-config-block">
+        <h4>{key}</h4>
+
+     
+        <div className="form-group">
+          <label>Database Location:</label>
+          <input
+            type="text"
+            className="input-field"
+            placeholder="Enter Database Location"
+            value={dbDetails[key]?.dbLocation || ''}
+            onChange={(e) =>
+              setDbDetails((prev) => ({
+                ...prev,
+                [key]: { ...prev[key], dbLocation: e.target.value },
+              }))
+            }
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Database Name:</label>
+          <input
+            type="text"
+            className="input-field"
+            placeholder="Enter DB Name"
+            value={dbDetails[key]?.dbName || ''}
+            onChange={(e) =>
+              setDbDetails((prev) => ({
+                ...prev,
+                [key]: { ...prev[key], dbName: e.target.value },
+              }))
+            }
+          />
+        </div>
+
+   
+        <div className="form-group">
+          <label>MDF File Path:</label>
+          <input
+            type="text"
+            className="input-field"
+            placeholder="Full path to MDF file"
+            value={dbDetails[key]?.mdfPath || ''}
+            onChange={(e) =>
+              setDbDetails((prev) => ({
+                ...prev,
+                [key]: { ...prev[key], mdfPath: e.target.value },
+              }))
+            }
+          />
+        </div>
+
+      
+        <div className="form-group">
+          <label>LDF File Path:</label>
+          <input
+            type="text"
+            className="input-field"
+            placeholder="Full path to LDF file"
+            value={dbDetails[key]?.ldfPath || ''}
+            onChange={(e) =>
+              setDbDetails((prev) => ({
+                ...prev,
+                [key]: { ...prev[key], ldfPath: e.target.value },
+              }))
+            }
+          />
+        </div>
+      </div>
+    ))}
+  </>
+)}
+<button onClick={handleDbRestore} disabled={dbloading} className="submit-btn">
+  {dbloading ? 'Processing...' : 'DB Restore'}
+</button>
+
+{dbmessage && <p className="message">{dbmessage}</p>} */}
+
+<h4>Database Restore</h4>
+
+{/* ✅ New Input Field for Base Path */}
+<div className="form-group">
+  <label> Base Location:</label>
+  <input
+    type="text"
+    className="input-field"
+    placeholder="Enter Base Path"
+    value={dbbasePath}
+    onChange={(e) => setdbBasePath(e.target.value)}
+  />
+</div>
+
+{/* ✅ Checkbox List */}
+<div className="form-group">
+  <label>Select Databases:</label>
+  <div className="checkbox-row">
+    {dbModules.map((db) => (
+      <label key={db} className="checkbox-inline">
+        <input
+          type="checkbox"
+          checked={!!dbDetails[db]}
+          onChange={(e) => handleDbCheckboxChange(db, e.target.checked)}
+        />
+        {db}
+      </label>
+    ))}
+  </div>
+</div>
+
+{/* ✅ DB Config Form */}
+{Object.keys(dbDetails).length > 0 && (
+  <>
+    {Object.keys(dbDetails).map((key) => (
+      <div key={key} className="db-config-block">
+        <h4>{key}</h4>
+
+        <div className="form-group">
+          {/* <label>Database Location:</label> */}
+          <input
+            type="hidden"
+            className="input-field"
+            placeholder="Enter Database Location"
+            value={dbDetails[key]?.dbLocation || ''}
+            onChange={(e) =>
+              setDbDetails((prev) => ({
+                ...prev,
+                [key]: { ...prev[key], dbLocation: e.target.value },
+              }))
+            }
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Database Name:</label>
+          <input
+            type="text"
+            className="input-field"
+            placeholder="Enter DB Name"
+            value={dbDetails[key]?.dbName || ''}
+            onChange={(e) =>
+              setDbDetails((prev) => ({
+                ...prev,
+                [key]: { ...prev[key], dbName: e.target.value },
+              }))
+            }
+          />
+        </div>
+
+        <div className="form-group">
+          <label>MDF File Path:</label>
+          <input
+            type="text"
+            className="input-field"
+            placeholder="Full path to MDF file"
+            value={dbDetails[key]?.mdfPath || ''}
+            onChange={(e) =>
+              setDbDetails((prev) => ({
+                ...prev,
+                [key]: { ...prev[key], mdfPath: e.target.value },
+              }))
+            }
+          />
+        </div>
+
+        <div className="form-group">
+          <label>LDF File Path:</label>
+          <input
+            type="text"
+            className="input-field"
+            placeholder="Full path to LDF file"
+            value={dbDetails[key]?.ldfPath || ''}
+            onChange={(e) =>
+              setDbDetails((prev) => ({
+                ...prev,
+                [key]: { ...prev[key], ldfPath: e.target.value },
+              }))
+            }
+          />
+        </div>
+      </div>
+    ))}
+  </>
+)}
+
+<button onClick={handleDbRestore} disabled={dbloading} className="submit-btn">
+  {dbloading ? 'Processing...' : 'DB Restore'}
+</button>
+
+{dbmessage && <p className="message">{dbmessage}</p>}
+
+
     </div>
   );
 };
