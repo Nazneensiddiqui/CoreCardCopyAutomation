@@ -1,7 +1,9 @@
 const sql = require('mssql');
+require('dotenv').config();
+
 
 const dbConfig = {
-  server: 'BPLDEVDB01',  // The SQL Server name or IP address
+  server: process.env.SERVER,  // The SQL Server name or IP address
   database: 'master',     // Your target database
   options: {
     encrypt: true,         // Use encryption
@@ -11,9 +13,9 @@ const dbConfig = {
   authentication: {
     type: 'ntlm',           // Use NTLM (Windows Authentication)
     options: {
-      domain: 'NEWVISIONSOFT',   // Your domain (if necessary)
-      userName: 'nazneen.bano',  // Your Windows username
-      password: 'Core@!card01',  // Your password
+      domain: process.env.DOMAIN,   // Your domain (if necessary)
+      userName: process.env.DB_USER,  // Your Windows username
+      password: process.env.DB_PASS,  // Your password
       },
        requestTimeout: 0
    

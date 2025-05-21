@@ -126,6 +126,9 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const fs = require('fs-extra');
 const path = require('path');
+require('dotenv').config();
+
+const port= process.env.PORT
 
 app.use(express.json()); 
 // Middleware
@@ -322,6 +325,6 @@ app.post('/db-restore', async (req, res) => {
 
 
 // Start the server
-app.listen(8000, () => {
-  console.log("Server is running on port 8000");
+app.listen(port, () => {
+  console.log(`Server is running on ${port} `);
 });
