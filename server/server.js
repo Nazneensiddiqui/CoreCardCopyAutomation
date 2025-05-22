@@ -1,125 +1,3 @@
-// const express = require('express');
-// const cors = require('cors');
-// const bodyParser = require('body-parser');
-// const fs = require('fs-extra'); // better alternative to fs
-// const app = express();
- 
-// app.use(cors());
-// app.use(bodyParser.json());
- 
-// app.post('/copy-folders', async (req, res) => {
-//   const tasks = req.body.tasks;
- 
-//   try {
-//     for (const [moduleName, paths] of Object.entries(tasks)) {
-//       await fs.copy(paths.source, paths.destination);
-//       console.log(`${moduleName} copied successfully.`);
-//     }
-//     res.json({ message: "All folders copied successfully!" });
-//   } catch (error) {
-//     console.error("Error during copy:", error);
-//     res.status(500).json({ message: "Error occurred while copying." });
-//   }
-// });
- 
-// app.listen(8000, () => {
-//   console.log("Server is running on port 8000");
-// });
-// **********************************************************************************************************************
-// const express = require('express');
-// const app = express();
-// const cors = require('cors');
-// const bodyParser = require('body-parser');
-// const fs = require('fs-extra');
-// const path = require('path');
-
-
-// app.use(cors());
-// app.use(bodyParser.json());
-
-// //********************* */
-// app.post('/check-path', (req, res) => {
-//   console.log(req.body)
-//   const { pathToCheck } = req.body;
-//   if (!pathToCheck) {
-//     return res.status(400).json({ exists: false, message: 'No path provided' });
-//   }
-
-//   const exists = fs.existsSync(pathToCheck);
-//   return res.json({ exists });
-// });
-
-
-// //********************************************************** */
-
-
-
-// const getFolderStats = (dirPath) => {
-//   let totalFiles = 0;
-//   let totalFolders = 0;
-
-//   const walk = (dir) => {
-//     const items = fs.readdirSync(dir, { withFileTypes: true });
-//     for (const item of items) {
-//       const fullPath = path.join(dir, item.name);
-//       if (item.isDirectory()) {
-//         totalFolders++;
-//         walk(fullPath);
-//       } else {
-//         totalFiles++;
-//       }
-//     }
-//   };
-
-//   try {
-//     walk(dirPath);
-//   } catch (e) {
-//     // Ignore inaccessible dirs
-//   }
-
-//   return { totalFiles, totalFolders };
-// };
-
-// app.post('/copy-folders', async (req, res) => {
-//   const tasks = req.body.tasks;
-//   const details = {};
-
-//   try {
-//     for (const [moduleName, paths] of Object.entries(tasks)) {
-//       const sourceStats = getFolderStats(paths.source);
-//       const start = Date.now();
-
-//       await fs.copy(paths.source, paths.destination);
-
-//       const end = Date.now();
-//       const destinationStats = getFolderStats(paths.destination);
-
-//       details[moduleName] = {
-//         sourceFiles: sourceStats.totalFiles,
-//         sourceFolders: sourceStats.totalFolders,
-//         destinationFiles: destinationStats.totalFiles,
-//         destinationFolders: destinationStats.totalFolders,
-//         durationSeconds: (end - start) / 1000
-//       };
-
-//       console.log(`${moduleName} copied successfully.`);
-//     }
-
-//     res.json({
-//       message: "All folders copied successfully!",
-//       details
-//     });
-//   } catch (error) {
-//     console.error("Error during copy:", error);
-//     res.status(500).json({ message: "Error occurred while copying." });
-//   }
-// });
-
-// app.listen(8000, () => {
-//   console.log("Server is running on port 8000");
-// });
-
-
 const express = require('express');
 const app = express();
 const cors = require('cors');
@@ -127,6 +5,9 @@ const bodyParser = require('body-parser');
 const fs = require('fs-extra');
 const path = require('path');
 require('dotenv').config();
+const sql = require('mssql');
+
+let poolPromise; // Declare poolPromise globally
 
 const port= process.env.PORT
 
@@ -135,7 +16,7 @@ app.use(express.json());
 app.use(cors());
 app.use(bodyParser.json());
 
-const { sql, poolPromise } = require('./db');
+// const { sql, poolPromise } = require('./db');
 
 //backup folder Helper function to get current date and time
  const getCurrentDateTime = () => {
@@ -199,20 +80,7 @@ const copyWithRenaming = async (source, destination) => {
   }
 };
 
-
-// Route to check if a path exists
-// app.post('/check-path', (req, res) => {
-//   console.log(req.body)
-//   const { pathToCheck } = req.body;
-//   if (!pathToCheck) {
-//     return res.status(400).json({ exists: false, message: 'No path provided' });
-//   }
-
-  // const exists = fs.existsSync(pathToCheck);
-  // return res.json({ exists });
-  // });
-
-  app.post('/check-path', (req, res) => {
+app.post('/check-path', (req, res) => {
   const { pathToCheck } = req.body;
   if (!pathToCheck) {
     return res.status(400).json({ exists: false, message: 'No path provided' });
@@ -265,17 +133,63 @@ app.post('/copy-folders', async (req, res) => {
   }
 });
 
-// *************************************dbRestore******************************************************************
-app.post('/db-restore', async (req, res) => {
+//*******************************************DB connecting**************************** */
+// DB connection route
+app.post('/db-connection', async (req, res) => {
+  console.log(req.body);
+  const { username, password, serverName } = req.body;
+
+  // If the username includes a domain (DOMAIN\\username), split it
+  let domain = '';
+  let userName = username;
   
-  console.log(req.body)
+  if (username.includes('\\')) {
+    const parts = username.split('\\');
+    domain = parts[0];  
+    userName = parts[1]; 
+  }
+
+  const Config = {
+    server: serverName,  
+    database: 'master',     
+    options: {
+      encrypt: true,         
+      trustServerCertificate: true, 
+    },
+    authentication: {
+      type: 'ntlm',          
+      options: {
+        domain: domain,   
+        userName: userName,  
+        password: password,  
+      },
+    }
+  };
+
+  try {
+    // Establishing a connection pool globally accessible
+    poolPromise = new sql.ConnectionPool(Config).connect();
+    poolPromise.then(() => {
+      console.log('Connected to SQL Server');
+    });
+    res.status(200).json({ message: '✅ DB Connection successful!' });
+  } catch (err) {
+    console.error('❌ DB Connection failed:', err.message);
+    res.status(500).json({ message: '❌ Connection failed', error: err.message });
+  }
+});
+
+// DB restore route
+app.post('/db-restore', async (req, res) => {
+  console.log(req.body);
   try {
     console.log('Attempting to restore DB...');
 
+    // Wait for poolPromise to be resolved
     const pool = await poolPromise;
     console.log('Connection pool established successfully.');
 
-      const {dbLocation, dbName, mdfPath,ldfPath }=req.body
+    const { dbLocation, dbName, mdfPath, ldfPath } = req.body;
 
     console.log(`Restoring DB: ${dbName}`);
     console.log(`MDF Path: ${mdfPath}`);
@@ -304,15 +218,13 @@ app.post('/db-restore', async (req, res) => {
         MOVE N'${logicalDataName}' TO N'${mdfPath}',
         MOVE N'${logicalLogName}' TO N'${ldfPath}',
         REPLACE,
-       STATS = 10;
+        STATS = 10;
     `;
 
     // Step 3: Execute restore
-    // const restoreResult = await pool.request().query(restoreQuery);
     const request = pool.request();
     request.timeout = 0; // ⬅ 0 means infinite wait
     const restoreResult = await request.query(restoreQuery);
-
 
     console.log('✅ Restore successful');
     res.status(200).json({ message: `✅ Database ${dbName} restored successfully.` });

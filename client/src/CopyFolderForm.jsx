@@ -2,6 +2,7 @@ import { useState } from 'react';
 import './CopyFolderForm.css';
 import core from './images/corecard.jpg';
 
+
 const modules = ["DSL", "WCF", "CoreMoney", "CoreAdmin", "SelfService", "PraxellAPI"];
 const dbModules = ["CoreMoneyDB", "CoreIssueDB", "CoreAuthDB", "CoreLibraryDB", "dashBoardDB"];
 
@@ -17,6 +18,10 @@ const CopyFolderForm = () => {
   const [dbmessage, setdbMessage] = useState('');
   const [dbloading, setdbLoading] = useState(false);
  const [dbbasePath, setdbBasePath] = useState('');
+ const [username, setUsername] = useState('');
+ const [password, setPassword] = useState("");
+const [serverName, setServerName] = useState('')
+const [dbTestMessage, setDbTestMessage] = useState('');
 
   const handleBasePathChange = (e) => {
     const value = e.target.value;
@@ -82,6 +87,7 @@ const CopyFolderForm = () => {
     }));
   };
 
+ 
   //****************** */ DB Restore Handlers********************************
 const dbFileMap = {
   CoreMoneyDB: "\\Application\\DB\\MPE\\CM.bak",
@@ -130,6 +136,29 @@ const handleDbCheckboxChange = (dbKey, checked) => {
       setMessage('Error occurred while copying...');
     } finally {
       setLoading(false);
+    }
+  };
+
+   //**************************DB connecting ********************************** */
+
+ const handleTestDbConnection = async () => {
+    setDbTestMessage("Testing connection...");
+
+    try {
+      const response = await fetch("http://localhost:8000/db-connection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username,
+          password,
+          serverName,
+        }),
+      });
+
+      const data = await response.json();
+      setDbTestMessage(data.message || "✅ DB Connection successful");
+    } catch (error) {
+      setDbTestMessage("❌ Failed to connect to the database");
     }
   };
 
@@ -277,9 +306,49 @@ const handleDbCheckboxChange = (dbKey, checked) => {
         </div>
       )}
 {/* ******************************************DBRestor************************************ */}
- 
-<h4>Database Restore</h4>
 
+<h4>Database Connect & Restore</h4>
+
+<div className="db-connection-form">
+      <div className="form-group-row">
+        <div className="form-group half">
+          <label>Username:</label>
+          <input
+            type="text"
+            className="input-field"
+            placeholder="Enter Donaim\Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
+        </div>
+
+        <div className="form-group half">
+          <label>Password:</label>
+          <input
+            type="password"
+            className="input-field"
+            placeholder="Enter SQL Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
+
+        <div className="form-group half">
+          <label>Server Name:</label>
+          <input
+            type="text"
+            className="input-field"
+            placeholder="Enter SQL Server Name"
+            value={serverName}
+            onChange={(e) => setServerName(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <button onClick={handleTestDbConnection} className="submit-btn" >🔌 Test DB Connection</button>
+
+      {dbTestMessage && <p className="message">{dbTestMessage}</p>}
+    </div>
 {/* ✅ New Input Field for Base Path */}
 <div className="form-group">
   <label> Base Location:</label>
@@ -384,8 +453,8 @@ const handleDbCheckboxChange = (dbKey, checked) => {
   </>
 )}
 
-<button onClick={handleDbRestore} disabled={dbloading} className="submit-btn">
-  {dbloading ? 'Processing...' : 'DB Restore'}
+<button onClick={handleDbRestore} disabled={dbloading} className="submit-btn"> 
+  {dbloading ? 'Processing...' :  ' 🔄 DB Restore'}
 </button>
 
 {dbmessage && <p className="message">{dbmessage}</p>}
